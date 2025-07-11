@@ -1,0 +1,49 @@
+name: Broken Link Checker
+
+on:
+  push:
+    branches: [ main ]
+  schedule:
+    # Runs at 00:00 UTC every day
+    - cron: '0 0 * * *'
+
+jobs:
+  link-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Set up lychee
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/lycheeverse/lychee/master/install.sh | sh -s -- -b $HOME/.local/bin
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Run lychee link checker
+        run: |
+          lychee \
+          --verbose \
+          --format markdown \
+          --base ${{ github.event.repository.html_url }} \
+          --output lychee-report.md \
+          ./**/*.{html,md}
+
+      - name: Create summary of broken links
+        if: always()
+        run: |
+          if [ -f lychee-report.md ]; then
+            echo "BROKEN LINKS FOUND!" > summary.md
+            echo "===================" >> summary.md
+            echo "" >> summary.md
+            cat lychee-report.md >> summary.md
+          else
+            echo "No broken links found! 🎉" > summary.md
+          fi
+
+      - name: Upload link checker report
+        uses: actions/upload-artifact@v3
+        with:
+          name: link-check-report
+          path: |
+            lychee-report.md
+            summary.md
